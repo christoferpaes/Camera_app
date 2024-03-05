@@ -1,4 +1,4 @@
-import sys
+iimport sys
 import cv2
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QPushButton, QLineEdit, QHBoxLayout, QMessageBox, QFileDialog
 from PyQt5.QtGui import QImage, QPixmap
@@ -9,181 +9,156 @@ import concurrent.futures
 from flask import Flask, render_template, Response
 import threading
 
-app = Flask(__name__, template_folder='templates')
+a = Flask(__name__, template_folder='templates')
 
-class CameraApp(QWidget):
-    def __init__(self):
-        super().__init__()
+class C(QWidget):
+  def __init__(s):
+    super().__init__()
 
-        # Set up the UI
-        self.setWindowTitle("Camera App")
-        self.resize(640, 520)
+    s.setWindowTitle("Camera App")
+    s.resize(640, 520)
 
-        self.image_label = QLabel(self)
-        self.image_label.setAlignment(Qt.AlignCenter)  # Align image to center
-        self.image_label.setMinimumSize(640, 480)  # Set minimum size for label
-        self.image_label.setScaledContents(True)  # Allow image to scale with label size
+    s.i_l = QLabel(s)
+    s.i_l.setAlignment(Qt.AlignCenter)
+    s.i_l.setMinimumSize(640, 480)
+    s.i_l.setScaledContents(True)
 
-        self.start_stop_button = QPushButton("Start Camera", self)
-        self.start_stop_button.clicked.connect(self.toggle_camera)
+    s.s_s_b = QPushButton("Start Camera", s)
+    s.s_s_b.clicked.connect(s.t_c)
 
-        self.directory_edit = QLineEdit(self)
-        self.directory_edit.setPlaceholderText("Enter directory path")
+    s.d_e = QLineEdit(s)
+    s.d_e.setPlaceholderText("Enter directory path")
 
-        self.browse_button = QPushButton("Browse", self)
-        self.browse_button.clicked.connect(self.browse_directory)
+    s.b_b = QPushButton("Browse", s)
+    s.b_b.clicked.connect(s.b_d)
 
-        directory_layout = QHBoxLayout()
-        directory_layout.addWidget(self.directory_edit)
-        directory_layout.addWidget(self.browse_button)
+    d_l = QHBoxLayout()
+    d_l.addWidget(s.d_e)
+    d_l.addWidget(s.b_b)
 
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.image_label)
-        layout.addWidget(self.start_stop_button)
-        layout.addLayout(directory_layout)
+    l = QVBoxLayout(s)
+    l.addWidget(s.i_l)
+    l.addWidget(s.s_s_b)
+    l.addLayout(d_l)
 
-        # Set up the camera
-        self.camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_frame)
-        self.camera_running = False
+    s.c = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    s.t = QTimer(s)
+    s.t.timeout.connect(s.u_f)
+    s.c_r = False
+    s.v_w = None
+    s.m_d = cv2.createBackgroundSubtractorMOG2()
+    s.r = False
+    s.l_m_t = None
+    s.z_f = 1.0
 
-        # Initialize video writer
-        self.video_writer = None
+  def t_c(s):
+    if not s.c_r:
+      s.s_s_b.setText("Stop Camera")
+      s.t.start(50)
+      s.s_s()
+    else:
+      s.s_s_b.setText("Start Camera")
+      s.t.stop()
+      s.s_s()
+    s.c_r = not s.c_r
 
-        # Initialize motion detector
-        self.motion_detector = cv2.createBackgroundSubtractorMOG2()
+  def s_s(s):
+    d = s.d_e.text()
+    if not d:
+      QMessageBox.warning(s, "Warning", "Please enter a directory path.")
+      return
+    if not os.path.exists(d):
+      QMessageBox.warning(s, "Warning", "Directory does not exist.")
+      return
 
-        # Variables for motion detection and recording
-        self.recording = False
-        self.last_motion_time = None
+    n = datetime.now()
+    t = n.strftime("%Y%m%d_%H%M%S")
+    v_f = os.path.join(d, f"session_{t}.mp4")
+    f_w = int(s.c.get(cv2.CAP_PROP_FRAME_WIDTH))
+    f_h = int(s.c.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    f = 20
+    c = cv2.VideoWriter_fourcc(*"mp4v")
+    s.v_w = cv2.VideoWriter(v_f, c, f, (f_w, f_h))
 
-        # Variables for zoom functionality
-        self.zoom_factor = 1.0
+  def s_s(s):
+    if s.v_w is not None:
+      s.v_w.release()
+      s.v_w = None
 
-    def toggle_camera(self):
-        if not self.camera_running:
-            self.start_stop_button.setText("Stop Camera")
-            self.timer.start(50)  # Update frame every 50 milliseconds
-            self.start_session()
-        else:
-            self.start_stop_button.setText("Start Camera")
-            self.timer.stop()
-            self.stop_session()
-        self.camera_running = not self.camera_running
+  def u_f(s):
+    r, f = s.c.read()
+    if r:
+      m = s.m_d.apply(f)
+      m_d = cv2.countNonZero(m) > 0
 
-    def start_session(self):
-        directory = self.directory_edit.text()
-        if not directory:
-            QMessageBox.warning(self, "Warning", "Please enter a directory path.")
-            return
-        if not os.path.exists(directory):
-            QMessageBox.warning(self, "Warning", "Directory does not exist.")
-            return
+      if m_d:
+        if not s.r:
+          s.s_s()
+          s.r = True
+          s.l_m_t = datetime.now()
+      elif s.r and (datetime.now() - s.l_m_t) > timedelta(minutes=5):
+        s.r = False
+        s.s_s()
 
-        now = datetime.now()
-        timestamp = now.strftime("%Y%m%d_%H%M%S")
-        video_file = os.path.join(directory, f"session_{timestamp}.mp4")
-        frame_width = int(self.camera.get(cv2.CAP_PROP_FRAME_WIDTH))
-        frame_height = int(self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = 20  # Frames per second
-        codec = cv2.VideoWriter_fourcc(*"mp4v")
-        self.video_writer = cv2.VideoWriter(video_file, codec, fps, (frame_width, frame_height))
+      if s.r:
+        if s.v_w is not None:
+          s.v_w.write(f)
 
-    def stop_session(self):
-        if self.video_writer is not None:
-            self.video_writer.release()
-            self.video_writer = None
+      f = s.a_z(f)
 
-    def update_frame(self):
-        ret, frame = self.camera.read()
-        if ret:
-            # Apply motion detection
-            fg_mask = self.motion_detector.apply(frame)
+      f = cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
+      h, w, ch = f.shape
+      b_p_l = ch * w
+      i = QImage(f.data, w, h, b_p_l, QImage.Format_RGB888)
+      p = QPixmap.fromImage(i)
+      s.i_l.setPixmap(p)
 
-            # Check if motion is detected
-            motion_detected = cv2.countNonZero(fg_mask) > 0
+  def a_z(s, f):
+    h, w, _ = f.shape
+    c = (w // 2, h // 2)
+    z_w = int(w * s.z_f)
+    z_h = int(h * s.z_f)
+    t_l_x = c[0] - z_w // 2
+    t_l_y = c[1] - z_h // 2
+    b_r_x = t_l_x + z_w
+    b_r_y = t_l_y + z_h
+    z_f = f[t_l_y:b_r_y, t_l_x:b_r_x]
+    return z_f
 
-            if motion_detected:
-                if not self.recording:
-                    self.start_session()
-                    self.recording = True
-                    self.last_motion_time = datetime.now()
-            elif self.recording and (datetime.now() - self.last_motion_time) > timedelta(minutes=5):
-                self.recording = False
-                self.stop_session()
+  def b_d(s):
+    d = QFileDialog.getExistingDirectory(s, "Select Directory")
+    if d:
+      s.d_e.setText(d)
 
-            if self.recording:
-                # Write frame to video file
-                if self.video_writer is not None:
-                    self.video_writer.write(frame)
+  def w_e(s, e):
+    s.s_s()
+    s.c.release()
 
-            # Apply zoom
-            frame = self.apply_zoom(frame)
-
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # Convert frame to RGB
-            h, w, ch = frame.shape
-            bytes_per_line = ch * w
-            image = QImage(frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
-            pixmap = QPixmap.fromImage(image)
-            self.image_label.setPixmap(pixmap)
-
-    def apply_zoom(self, frame):
-        h, w, _ = frame.shape
-        center = (w // 2, h // 2)
-        zoomed_width = int(w * self.zoom_factor)
-        zoomed_height = int(h * self.zoom_factor)
-        top_left_x = center[0] - zoomed_width // 2
-        top_left_y = center[1] - zoomed_height // 2
-        bottom_right_x = top_left_x + zoomed_width
-        bottom_right_y = top_left_y + zoomed_height
-        zoomed_frame = frame[top_left_y:bottom_right_y, top_left_x:bottom_right_x]
-        return zoomed_frame
-
-    def browse_directory(self):
-        directory = QFileDialog.getExistingDirectory(self, "Select Directory")
-        if directory:
-            self.directory_edit.setText(directory)
-
-    def wheelEvent(self, event):
-        if event.angleDelta().y() > 0:
-            # Scrolling up (zoom in)
-            self.zoom_factor += 0.1
-        else:
-            # Scrolling down (zoom out)
-            self.zoom_factor -= 0.1
-            if self.zoom_factor < 0.1:
-                self.zoom_factor = 0.1
-
-    def closeEvent(self, event):
-        self.stop_session()
-        self.camera.release()
-
-def generate_frames():
-    camera = cv2.VideoCapture(0)
+def g_f():
+    c = cv2.VideoCapture(0)
     while True:
-        success, frame = camera.read()
-        if not success:
+        s, f = c.read()
+        if not s:
             break
         else:
-            ret, buffer = cv2.imencode('.jpg', frame)
-            frame = buffer.tobytes()
+            r, b = cv2.imencode('.jpg', f)
+            f = b.tobytes()
             yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+                   b'Content-Type: image/jpeg\r\n\r\n' + f + b'\r\n')
 
-@app.route('/')
+@a.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/video_feed')
+@a.route('/video_feed')
 def video_feed():
-    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(g_f(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == "__main__":
-    t1 = threading.Thread(target=app.run, kwargs={'debug':False, 'port':8000})
+    t1 = threading.Thread(target=a.run, kwargs={'debug':False, 'port':8000})
     t1.start()
-    main_app = QApplication(sys.argv)
-    window = CameraApp()
-    window.show()
-    sys.exit(main_app.exec_())
+    m_a = QApplication(sys.argv)
+    w = C()
+    w.show()
+    sys.exit(m_a.exec_())
 
