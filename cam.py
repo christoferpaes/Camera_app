@@ -1,44 +1,15 @@
 import sys
 import cv2
-import threading
-from flask import Flask, render_template, Response
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QPushButton, QLineEdit, QHBoxLayout, QMessageBox, QFileDialog
 from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtCore import QTimer, Qt, QSize, QThread
+from PyQt5.QtCore import QTimer, Qt
 import os
 from datetime import datetime, timedelta
-from cam import app
+import concurrent.futures
+from flask import Flask, render_template, Response
+import threading
 
-class FlaskThread(QThread):
-    def __init__(self):
-        super().__init__()
-
-    def run(self):
-        app = Flask(__name__)
-
-        camera = cv2.VideoCapture(0)
-
-        def generate_frames():
-            while True:
-                success, frame = camera.read()
-                if not success:
-                    break
-                else:
-                    ret, buffer = cv2.imencode('.jpg', frame)
-                    frame = buffer.tobytes()
-                    yield (b'--frame\r\n'
-                            b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
-        @app.route('/')
-        def index():
-            return render_template('index.html')
-
-        @app.route('/video_feed')
-        def video_feed():
-            return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
-
-        app.run(debug=True)  # Run Flask app
-
+app = Flask(__name__, template_folder='templates')
 
 class CameraApp(QWidget):
     def __init__(self):
@@ -188,16 +159,31 @@ class CameraApp(QWidget):
         self.stop_session()
         self.camera.release()
 
-def main():
-    app = QApplication(sys.argv)
-    window = CameraApp()
-    window.show()
+def generate_frames():
+    camera = cv2.VideoCapture(0)
+    while True:
+        success, frame = camera.read()
+        if not success:
+            break
+        else:
+            ret, buffer = cv2.imencode('.jpg', frame)
+            frame = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
-    flask_thread = FlaskThread()
-    flask_thread.start()
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-    sys.exit(app.exec_())
+@app.route('/video_feed')
+def video_feed():
+    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == "__main__":
-    app.run(debug=True)
-    main()
+    t1 = threading.Thread(target=app.run, kwargs={'debug':False, 'port':8000})
+    t1.start()
+    main_app = QApplication(sys.argv)
+    window = CameraApp()
+    window.show()
+    sys.exit(main_app.exec_())
+
