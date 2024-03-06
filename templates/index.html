@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Feed</title>
+    <script>
+        function toggleFeed() {
+            var video = document.getElementById("video_feed");
+            var button = document.getElementById("toggle_button");
+            if (video.style.display === "none") {
+                video.style.display = "block";
+                button.innerText = "Switch to Web";
+            } else {
+                video.style.display = "none";
+                button.innerText = "Switch to App";
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>Camera Feed</h1>
+    <button id="toggle_button" onclick="toggleFeed()">Switch to Web</button>
+    <img src="{{ url_for('video_feed') }}" id="video_feed" style="display: none;" alt="Camera Feed">
+</body>
+</html>
